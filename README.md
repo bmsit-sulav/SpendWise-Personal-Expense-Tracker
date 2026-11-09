@@ -56,8 +56,8 @@ SpendWise/
 ### Clone the Repository
 
 ```bash
-git clone https://github.com/YOUR-USERNAME/SpendWise-CPP.git
-cd SpendWise-CPP
+git clone [https://github.com/YOUR-USERNAME/SpendWise-CPP.git
+cd SpendWise-CPP](https://github.com/bmsit-sulav/SpendWise-Personal-Expense-Tracker.git)
 ```
 
 ### Compile the Project
