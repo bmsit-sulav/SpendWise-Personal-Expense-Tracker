@@ -66,3 +66,13 @@ vcpkg_installed/
 # test output & cache
 Testing/
 .cache/
+
+# Node.js
+node_modules/
+npm-debug.log*
+
+# Local expense data
+data/expenses.json
+data/expenses.json.*.tmp
+data/exchange-rates.json
+data/exchange-rates.json.*.tmp
