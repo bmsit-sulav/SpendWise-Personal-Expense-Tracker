@@ -1,15 +1,15 @@
 :root {
   color-scheme: light;
-  --ink: #1d2925;
-  --muted: #78827d;
-  --line: #e7ebe7;
+  --ink: #202722;
+  --muted: #747d76;
+  --line: #e5e9e5;
   --paper: #fff;
-  --canvas: #f5f7f2;
-  --green: #2a7155;
-  --green-dark: #1f5a43;
-  --green-pale: #e9f2eb;
-  --coral: #d78a6d;
-  font-family: "DM Sans", sans-serif;
+  --canvas: #eef0ee;
+  --green: #68836d;
+  --green-dark: #425f49;
+  --green-pale: #eaf0e9;
+  --coral: #ad765f;
+  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", "Helvetica Neue", sans-serif;
   font-synthesis: none;
   text-rendering: optimizeLegibility;
 }
@@ -143,6 +143,242 @@ tbody tr:last-child td { border-bottom: 0; }
 .page-footer span { color: #768178; font-weight: 700; }
 .sr-only { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0, 0, 0, 0); white-space: nowrap; clip-path: inset(50%); }
 
+/* Refined neutral surfaces and subtle sage accents. */
+body {
+  background:
+    radial-gradient(ellipse at 86% 0%, rgba(222, 229, 222, .42), transparent 34rem),
+    var(--canvas);
+}
+.sidebar {
+  background: rgba(251, 252, 250, .96);
+  border-right-color: #e6eae5;
+}
+.brand { color: #202722; }
+.brand-mark {
+  border-radius: 10px;
+  background: #dce7dc;
+  color: #385340;
+  box-shadow: inset 0 0 0 1px rgba(67, 94, 72, .08);
+}
+.brand-light { color: #66806b; }
+.sidebar-label, .eyebrow { color: #89928a; }
+.nav-link {
+  border-radius: 8px;
+  color: #737b74;
+}
+.nav-link:hover, .nav-link.active {
+  background: #e8eee7;
+  color: #385340;
+}
+.sidebar-note {
+  border-color: #e5e9e3;
+  background: linear-gradient(145deg, #f3f6f1, #edf2eb);
+}
+.note-spark { color: #718b73; }
+.sidebar-footer { color: #7d867e; }
+.topbar { border-bottom-color: #e4e8e3; }
+.currency-control { color: #707971; }
+.currency-control select {
+  border-color: #dfe5df;
+  border-radius: 8px;
+  background: rgba(255, 255, 255, .8);
+}
+.rate-status { color: #747d76; }
+.avatar {
+  border-color: #dce5dc;
+  background: #e8eee7;
+  color: #425f49;
+}
+.page-heading h1 { color: #202722; }
+.page-heading h1 span { color: #607b65; }
+.heading-link {
+  border-color: #dce4dc;
+  border-radius: 8px;
+  background: rgba(255, 255, 255, .84);
+  color: #415e48;
+  box-shadow: 0 2px 6px rgba(38, 49, 40, .025);
+}
+.heading-link:hover { border-color: #b7c8b8; }
+.stat-card, .panel {
+  border-color: #e4e8e3;
+  border-radius: 12px;
+  box-shadow: 0 5px 18px rgba(34, 45, 37, .025);
+}
+.stat-primary {
+  border-color: #dde6dc;
+  background: linear-gradient(135deg, #edf2eb, #e8efe7);
+}
+.stat-top { color: #69736b; }
+.stat-icon {
+  background: #dce7dc;
+  color: #526f58;
+}
+.stat-icon.pale {
+  background: #f0f3ef;
+  color: #717c73;
+}
+.stat-value { color: #202722; }
+.stat-caption { color: #818a82; }
+.panel-heading h2 { color: #252c27; }
+.count-pill { background: #edf1ed; color: #69746b; }
+.search-box, .filter-control select, .filter-control input {
+  border-color: #e3e8e3;
+  border-radius: 8px;
+  background: #fff;
+}
+.search-box:focus-within {
+  border-color: #9aaf9b;
+  box-shadow: 0 0 0 3px rgba(221, 232, 220, .5);
+}
+.search-box input { color: #252c27; }
+.search-box input::placeholder { color: #9aa29b; }
+.filter-control select, .filter-control input { color: #59635b; }
+.filter-control select:focus, .filter-control input:focus {
+  border-color: #9aaf9b;
+  box-shadow: 0 0 0 3px rgba(221, 232, 220, .45);
+}
+.text-button { color: #707a71; }
+.text-button:hover, .row-action:hover { color: #49684f; }
+thead { background: #f8faf8; }
+th {
+  border-color: #edf0ec;
+  color: #818b82;
+}
+td {
+  border-bottom-color: #eef1ed;
+  color: #737d75;
+}
+tbody tr { transition: background .16s ease; }
+tbody tr:hover { background: #fafbf9; }
+.description-cell, .amount-cell { color: #29312b; }
+.description-cell small { color: #8d968e; }
+.category-tag {
+  background: #edf2ec;
+  color: #526a56;
+}
+.row-action { color: #747e75; }
+.row-action.delete:hover { color: #9b554b; }
+.empty-illustration, .form-mark {
+  background: #e9f0e8;
+  color: #526f58;
+}
+.empty-state strong { color: #29312b; }
+.empty-state p { color: #7c867e; }
+.empty-state a, .conversion-preview { color: #4b6b52; }
+.form-intro { color: #7b857d; }
+.field-label { color: #515c53; }
+.field-label > span:first-child { color: #a26d58; }
+.field-label .optional { color: #879188; }
+.amount-input-wrap {
+  border-color: #dfe6de;
+  border-radius: 8px;
+  background: #f9fbf8;
+  color: #55725a;
+}
+.amount-input-wrap:focus-within,
+.field-group select:focus,
+.field-group input:focus,
+#description-input:focus {
+  border-color: #9aaf9b;
+  box-shadow: 0 0 0 3px rgba(221, 232, 220, .5);
+}
+.amount-input-wrap input { color: #202722; }
+.amount-input-wrap input::placeholder, #description-input::placeholder { color: #a7afa8; }
+.field-group select, .field-group input, #description-input {
+  border-color: #e2e7e2;
+  border-radius: 8px;
+  color: #4e5950;
+}
+.currency-hint { color: #848e85; }
+.primary-button {
+  border-radius: 8px;
+  background: #526f58;
+  box-shadow: 0 3px 8px rgba(60, 83, 64, .12);
+}
+.primary-button:hover { background: #405d47; }
+.cancel-button {
+  border-color: #e0e6df;
+  border-radius: 8px;
+  color: #5f6b61;
+}
+.page-footer { color: #858e86; }
+.page-footer span { color: #55665a; }
+button:focus-visible, a:focus-visible, input:focus-visible, select:focus-visible {
+  outline: 3px solid rgba(104, 131, 109, .35);
+  outline-offset: 2px;
+}
+
+/* Keep hover and press feedback subtle, quick, and consistent. */
+.nav-link,
+.heading-link,
+.primary-button,
+.cancel-button,
+.row-action,
+.text-button,
+.currency-control select,
+.filter-control select,
+.filter-control input,
+.search-box,
+.field-group select,
+.field-group input,
+#description-input,
+.amount-input-wrap {
+  transition:
+    background-color .18s ease,
+    border-color .18s ease,
+    box-shadow .18s ease,
+    color .18s ease,
+    filter .18s ease,
+    transform .18s ease;
+}
+
+.cancel-button:hover,
+.currency-control select:hover,
+.filter-control select:hover,
+.filter-control input:hover,
+.field-group select:hover,
+.field-group input:hover,
+#description-input:hover,
+.search-box:hover {
+  border-color: #bac8bb;
+}
+
+.heading-link:hover,
+.primary-button:hover,
+.cancel-button:hover,
+.row-action:hover,
+.text-button:hover,
+.currency-control select:hover,
+.filter-control select:hover {
+  filter: saturate(1.14);
+}
+
+.heading-link:hover,
+.primary-button:hover,
+.cancel-button:hover {
+  transform: translateY(-1px);
+}
+
+.heading-link:active,
+.primary-button:active,
+.cancel-button:active {
+  transform: translateY(0) scale(.99);
+  filter: saturate(1.2);
+}
+
+.nav-link:hover { filter: saturate(1.12); }
+.row-action:active, .text-button:active { transform: scale(.97); }
+.primary-button:disabled { filter: none; }
+
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after {
+    scroll-behavior: auto !important;
+    animation-duration: .01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: .01ms !important;
+  }
+}
+
 @media (max-width: 1180px) {
   .main-content { padding: 0 30px; }
   .sidebar { width: 210px; }
@@ -194,4 +430,79 @@ tbody tr:last-child td { border-bottom: 0; }
   .form-panel { padding-bottom: 14px; }
   #expense-form { padding: 0 14px; }
   .form-intro { margin: 0 14px 13px; }
+}
+
+/* Use a consistent system typeface and a more readable information hierarchy. */
+body {
+  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", "Helvetica Neue", sans-serif;
+  font-size: 14px;
+  line-height: 1.5;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+.brand,
+.brand-mark,
+.sidebar-note strong,
+.avatar,
+.page-heading h1,
+.stat-value,
+.panel-heading h2,
+.amount-input-wrap input,
+.empty-state strong {
+  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", "Helvetica Neue", sans-serif;
+  font-kerning: normal;
+}
+
+.brand { font-size: 20px; letter-spacing: -.7px; }
+.brand-mark { font-size: 21px; }
+.sidebar-label { font-size: 10px; letter-spacing: 1.2px; }
+.nav-link { font-size: 13px; }
+.sidebar-note strong { font-size: 13px; }
+.sidebar-note p { font-size: 12px; line-height: 1.6; }
+.sidebar-footer { font-size: 11px; }
+.breadcrumb { font-size: 12px; }
+.currency-control, .currency-control select { font-size: 12px; }
+.rate-status { font-size: 10px; }
+.eyebrow { font-size: 10px; letter-spacing: 1.25px; }
+.page-heading h1 { font-size: clamp(28px, 3vw, 36px); letter-spacing: -1.1px; }
+.subtitle { font-size: 14px; line-height: 1.55; }
+.heading-link { font-size: 13px; }
+.stat-top { font-size: 12px; }
+.stat-value { font-size: clamp(23px, 2.4vw, 30px); letter-spacing: -.7px; font-variant-numeric: tabular-nums; }
+.stat-caption { font-size: 11px; }
+.panel-heading .eyebrow { font-size: 9px; }
+.panel-heading h2 { font-size: 17px; letter-spacing: -.25px; }
+.count-pill { font-size: 11px; font-variant-numeric: tabular-nums; }
+.search-box input, .filter-control select, .filter-control input { font-size: 12px; }
+.text-button { font-size: 11px; }
+th { font-size: 9px; letter-spacing: .75px; }
+td { font-size: 12px; }
+.description-cell { font-size: 13px; }
+.description-cell small { font-size: 11px; }
+.category-tag { font-size: 10px; }
+.amount-cell { font-variant-numeric: tabular-nums; }
+.row-action { font-size: 10px; }
+.empty-state strong { font-size: 14px; }
+.empty-state p { font-size: 12px; }
+.empty-state a { font-size: 11px; }
+.form-intro { font-size: 12px; }
+.field-label { font-size: 12px; }
+.field-label .optional { font-size: 11px; }
+.amount-input-wrap input { font-size: 19px; font-variant-numeric: tabular-nums; }
+.field-group select, .field-group input, #description-input { font-size: 12px; }
+.currency-hint, .conversion-preview { font-size: 10px; line-height: 1.5; }
+.primary-button { font-size: 12px; }
+.cancel-button { font-size: 11px; }
+.form-message { font-size: 11px; }
+.page-footer { font-size: 10px; }
+
+@media (max-width: 560px) {
+  .brand { font-size: 17px; }
+  .nav-link { font-size: 10px; }
+  .breadcrumb, .currency-control select { font-size: 10px; }
+  .currency-control { font-size: 0; }
+  .page-heading h1 { font-size: 27px; }
+  .subtitle { font-size: 11px; }
+  .stat-value { font-size: 23px; }
 }
