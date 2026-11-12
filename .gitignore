@@ -70,9 +70,15 @@ Testing/
 # Node.js
 node_modules/
 npm-debug.log*
+__pycache__/
+*.py[cod]
 
 # Local expense data
 data/expenses.json
 data/expenses.json.*.tmp
+data/budgets.json
+data/budgets.json.*.tmp
+data/savings-goals.json
+data/savings-goals.json.*.tmp
 data/exchange-rates.json
 data/exchange-rates.json.*.tmp

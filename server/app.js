@@ -2,12 +2,24 @@ const fs = require("node:fs/promises");
 const http = require("node:http");
 const path = require("node:path");
 const { createStore } = require("./store");
-const { validateExpense } = require("./validation");
+const { createBudgetStore } = require("./budget-store");
+const { createSavingsGoalStore } = require("./savings-goal-store");
+const { calculateSavingsPlan } = require("./savings-goal-plan");
+const {
+  validateExpense,
+  validateBudget,
+  validateSavingsGoal,
+  validateBudgetMonth,
+} = require("./validation");
 const { createExchangeRateService } = require("./exchange-rates");
+const { createSpendingComparison } = require("./spending-comparison");
+const { createExpenseCalendar } = require("./expense-calendar");
 
 const ROOT = path.resolve(__dirname, "..");
 const DEFAULT_PUBLIC_DIR = path.join(ROOT, "public");
 const DEFAULT_DATA_FILE = path.join(ROOT, "data", "expenses.json");
+const DEFAULT_BUDGETS_FILE = path.join(ROOT, "data", "budgets.json");
+const DEFAULT_SAVINGS_GOALS_FILE = path.join(ROOT, "data", "savings-goals.json");
 const MAX_BODY_BYTES = 1024 * 1024;
 const CONTENT_TYPES = {
   ".css": "text/css; charset=utf-8",
@@ -86,6 +98,8 @@ async function serveStatic(request, response, publicDir, pathname) {
 function createApp(options = {}) {
   const publicDir = path.resolve(options.publicDir || DEFAULT_PUBLIC_DIR);
   const store = createStore(options.dataFile || DEFAULT_DATA_FILE);
+  const budgetStore = createBudgetStore(options.budgetsFile || DEFAULT_BUDGETS_FILE);
+  const savingsGoalStore = createSavingsGoalStore(options.savingsGoalsFile || DEFAULT_SAVINGS_GOALS_FILE);
   const exchangeRates = createExchangeRateService({
     cacheFile: options.ratesFile,
     fetchRates: options.fetchRates,
@@ -98,6 +112,90 @@ function createApp(options = {}) {
       const pathname = url.pathname;
       if (request.method === "GET" && pathname === "/api/exchange-rates") {
         sendJson(response, 200, await exchangeRates.getRates());
+        return;
+      }
+      if (request.method === "GET" && pathname === "/api/spending-comparison") {
+        const month = validateBudgetMonth(url.searchParams.get("month"));
+        sendJson(response, 200, createSpendingComparison(await store.list(), month));
+        return;
+      }
+      if (request.method === "GET" && pathname === "/api/expense-calendar") {
+        const month = validateBudgetMonth(url.searchParams.get("month"));
+        sendJson(response, 200, createExpenseCalendar(await store.list(), month));
+        return;
+      }
+      if (pathname === "/api/budgets" && request.method === "GET") {
+        const month = validateBudgetMonth(url.searchParams.get("month"));
+        sendJson(response, 200, await budgetStore.list(month));
+        return;
+      }
+      if (pathname === "/api/budgets" && request.method === "PUT") {
+        const fields = await toStoredCurrency(validateBudget(await readJson(request)), exchangeRates);
+        sendJson(response, 200, await budgetStore.upsert(fields));
+        return;
+      }
+      if (pathname === "/api/budgets" && request.method === "DELETE") {
+        const month = validateBudgetMonth(url.searchParams.get("month"));
+        const category = url.searchParams.get("category");
+        if (!category || !category.trim()) {
+          const error = new Error("A budget category is required.");
+          error.statusCode = 400;
+          throw error;
+        }
+        const removed = await budgetStore.remove(month, category.trim());
+        if (!removed) {
+          sendJson(response, 404, { error: "Budget not found." });
+          return;
+        }
+        sendJson(response, 200, { deleted: true });
+        return;
+      }
+      if (pathname === "/api/savings-goals" && request.method === "GET") {
+        const goals = await savingsGoalStore.list();
+        const today = localDateValue();
+        sendJson(response, 200, goals.map((goal) => ({
+          ...goal,
+          plan: calculateSavingsPlan(goal, today),
+        })));
+        return;
+      }
+      if (pathname === "/api/savings-goals" && request.method === "POST") {
+        const fields = await toStoredSavingsGoal(validateSavingsGoal(await readJson(request)), exchangeRates);
+        const goal = await savingsGoalStore.create(fields);
+        sendJson(response, 201, {
+          ...goal,
+          plan: calculateSavingsPlan(goal, localDateValue()),
+        });
+        return;
+      }
+      const savingsGoalMatch = pathname.match(/^\/api\/savings-goals\/([^/]+)$/);
+      if (savingsGoalMatch && request.method === "PUT") {
+        const fields = await toStoredSavingsGoal(validateSavingsGoal(await readJson(request)), exchangeRates);
+        const goal = await savingsGoalStore.update(decodeURIComponent(savingsGoalMatch[1]), fields);
+        if (!goal) {
+          sendJson(response, 404, { error: "Savings goal not found." });
+          return;
+        }
+        sendJson(response, 200, {
+          ...goal,
+          plan: calculateSavingsPlan(goal, localDateValue()),
+        });
+        return;
+      }
+      if (savingsGoalMatch && request.method === "DELETE") {
+        const removed = await savingsGoalStore.remove(decodeURIComponent(savingsGoalMatch[1]));
+        if (!removed) {
+          sendJson(response, 404, { error: "Savings goal not found." });
+          return;
+        }
+        sendJson(response, 200, { deleted: true });
+        return;
+      }
+      if (
+        request.method === "GET" &&
+        ["/comparison", "/budgets", "/savings-goals", "/calendar"].includes(pathname)
+      ) {
+        await serveStatic(request, response, publicDir, "/");
         return;
       }
       if (request.method === "GET" && pathname === "/api/expenses") {
@@ -169,6 +267,24 @@ async function toStoredCurrency(fields, exchangeRates) {
     ...expense,
     amountCents: Math.round(amountCents / rates.rates[currency]),
   };
+}
+
+async function toStoredSavingsGoal(fields, exchangeRates) {
+  const { currency, ...goal } = fields;
+  if (currency === "INR") return goal;
+  const rates = await exchangeRates.getRates();
+  return {
+    ...goal,
+    targetCents: Math.round(goal.targetCents / rates.rates[currency]),
+    savedCents: Math.round(goal.savedCents / rates.rates[currency]),
+  };
+}
+
+function localDateValue(date = new Date()) {
+  const year = date.getFullYear();
+  const month = String(date.getMonth() + 1).padStart(2, "0");
+  const day = String(date.getDate()).padStart(2, "0");
+  return `${year}-${month}-${day}`;
 }
 
 module.exports = { createApp };

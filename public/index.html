@@ -5,7 +5,8 @@
     <meta name="viewport" content="width=device-width, initial-scale=1">
     <meta name="theme-color" content="#f3f5f2">
     <meta name="description" content="A simple personal expense tracker for understanding your everyday spending.">
-    <title>SpendWise — Personal Expense Tracker</title>
+    <title>SpendWise — Personal expense tracker</title>
+    <script src="/page-route.js"></script>
     <link rel="stylesheet" href="/styles.css">
     <script src="/app.js" defer></script>
   </head>
@@ -16,10 +17,14 @@
           <span class="brand-mark" aria-hidden="true">s</span>
           <span>spend<span class="brand-light">wise</span></span>
         </a>
-        <div class="sidebar-label">WORKSPACE</div>
+        <div class="sidebar-label">Workspace</div>
         <nav aria-label="Main navigation">
-          <a class="nav-link active" href="#overview"><span class="nav-icon" aria-hidden="true">◫</span>Overview</a>
-          <a class="nav-link" href="#transactions"><span class="nav-icon" aria-hidden="true">↗</span>Transactions</a>
+          <a class="nav-link" data-page="home" href="/"><span class="nav-icon" aria-hidden="true">◫</span>Overview</a>
+          <a class="nav-link" data-page="transactions" href="/#transactions"><span class="nav-icon" aria-hidden="true">↗</span>Transactions</a>
+          <a class="nav-link" data-page="comparison" href="/comparison"><span class="nav-icon" aria-hidden="true">↕</span>Spending comparison</a>
+          <a class="nav-link" data-page="budgets" href="/budgets"><span class="nav-icon" aria-hidden="true">◎</span>Budgets</a>
+          <a class="nav-link" data-page="savings-goals" href="/savings-goals"><span class="nav-icon" aria-hidden="true">◉</span>Savings goals</a>
+          <a class="nav-link" data-page="calendar" href="/calendar"><span class="nav-icon" aria-hidden="true">▦</span>Expense calendar</a>
         </nav>
         <div class="sidebar-note">
           <span class="note-spark" aria-hidden="true">✳</span>
@@ -31,9 +36,9 @@
 
       <main class="main-content">
         <header class="topbar">
-          <div class="breadcrumb">Workspace <span>/</span> Overview</div>
+          <div class="breadcrumb">Workspace <span>/</span> <span id="breadcrumb-current">Overview</span></div>
           <div class="topbar-right">
-            <label class="currency-control" for="currency-select">Display Currency
+            <label class="currency-control" for="currency-select">Display currency
               <select id="currency-select" aria-label="Display currency" disabled>
                 <option value="INR">INR ₹</option>
                 <option value="USD">USD $</option>
@@ -50,10 +55,10 @@
         <section class="page-heading" id="overview">
           <div>
             <p class="eyebrow" id="today-label"></p>
-            <h1>Your Money, <span>in Perspective.</span></h1>
+            <h1>Your money, <span>in perspective.</span></h1>
             <p class="subtitle">A clearer view of your everyday spending starts here.</p>
           </div>
-          <a class="heading-link" href="#add-expense"><span aria-hidden="true">＋</span> Add an Expense</a>
+          <a class="heading-link" href="#add-expense"><span aria-hidden="true">＋</span> Add an expense</a>
         </section>
 
         <section class="stats-grid" aria-label="Spending summary">
@@ -74,12 +79,233 @@
           </article>
         </section>
 
+        <section class="panel comparison-panel" id="comparison" aria-labelledby="comparison-title">
+          <div class="panel-heading comparison-heading">
+            <div>
+              <p class="eyebrow">MONTH OVER MONTH</p>
+              <h2 id="comparison-title">Spending comparison</h2>
+              <p class="comparison-range" id="comparison-range">This month compared with last month</p>
+            </div>
+            <span class="comparison-period" id="comparison-period">—</span>
+          </div>
+          <p class="comparison-message" id="comparison-message" role="status" aria-live="polite"></p>
+          <div class="comparison-summary" aria-label="Monthly spending comparison">
+            <article class="comparison-stat current">
+              <span id="comparison-current-label">This month</span>
+              <strong id="comparison-current-total">—</strong>
+              <small>Recorded expenses</small>
+            </article>
+            <article class="comparison-stat">
+              <span id="comparison-previous-label">Last month</span>
+              <strong id="comparison-previous-total">—</strong>
+              <small>Recorded expenses</small>
+            </article>
+            <article class="comparison-stat change">
+              <span>Change</span>
+              <strong id="comparison-change">—</strong>
+              <small id="comparison-change-caption">Compared with last month</small>
+            </article>
+          </div>
+          <div class="comparison-details">
+            <section class="comparison-card" aria-labelledby="category-changes-title">
+              <div class="comparison-card-heading">
+                <div>
+                  <h3 id="category-changes-title">Category changes</h3>
+                  <p>Categories with different spending from last month.</p>
+                </div>
+              </div>
+              <div class="comparison-category-list" id="comparison-category-list"></div>
+              <p class="comparison-empty" id="comparison-category-empty" hidden>No category spending changes to show.</p>
+            </section>
+            <section class="comparison-card" aria-labelledby="unusual-expenses-title">
+              <div class="comparison-card-heading">
+                <div>
+                  <h3 id="unusual-expenses-title">Unusual expenses</h3>
+                  <p>At least 2× the category median, with 3+ expenses across both months.</p>
+                </div>
+              </div>
+              <div class="unusual-expense-list" id="unusual-expense-list"></div>
+              <p class="comparison-empty" id="unusual-expense-empty" hidden>No unusual expenses identified for these months.</p>
+            </section>
+          </div>
+        </section>
+
+        <section class="panel expense-calendar-panel" id="expense-calendar" aria-labelledby="expense-calendar-title">
+          <div class="panel-heading expense-calendar-heading">
+            <div>
+              <p class="eyebrow">Daily overview</p>
+              <h2 id="expense-calendar-title">Expense calendar</h2>
+              <p class="expense-calendar-intro">Explore daily totals and spot recurring spending.</p>
+            </div>
+            <label class="calendar-month-control" for="calendar-month">
+              <span>Calendar month</span>
+              <input id="calendar-month" type="month" aria-label="Calendar month">
+            </label>
+          </div>
+          <p class="calendar-message" id="calendar-message" role="status" aria-live="polite"></p>
+          <div class="calendar-summary" aria-label="Monthly calendar summary">
+            <article class="calendar-stat total">
+              <span>Monthly total</span>
+              <strong id="calendar-total">—</strong>
+              <small id="calendar-expense-count">Recorded expenses</small>
+            </article>
+            <article class="calendar-stat high-days">
+              <span>High-spending days</span>
+              <strong id="calendar-high-count">—</strong>
+              <small id="calendar-high-threshold">At least 1.5× daily average</small>
+            </article>
+            <article class="calendar-stat">
+              <span>Daily average</span>
+              <strong id="calendar-average">—</strong>
+              <small>Monthly total divided by calendar days</small>
+            </article>
+          </div>
+          <div class="calendar-content">
+            <section class="calendar-card" aria-label="Expense calendar days">
+              <div class="calendar-legend">
+                <span><i class="calendar-legend-dot high" aria-hidden="true"></i>High-spending day</span>
+                <span><i class="calendar-legend-dot ordinary" aria-hidden="true"></i>Day with expenses</span>
+              </div>
+              <div class="calendar-weekdays" aria-hidden="true">
+                <span>Mon</span><span>Tue</span><span>Wed</span><span>Thu</span><span>Fri</span><span>Sat</span><span>Sun</span>
+              </div>
+              <div class="calendar-grid" id="calendar-grid" role="group" aria-label="Daily expense totals"></div>
+            </section>
+            <aside class="calendar-day-card" aria-labelledby="calendar-selected-date">
+              <p class="eyebrow">Selected day</p>
+              <h3 id="calendar-selected-date">Choose a day</h3>
+              <strong class="calendar-selected-total" id="calendar-selected-total">—</strong>
+              <p class="calendar-selected-count" id="calendar-selected-count"></p>
+              <div class="calendar-day-expenses" id="calendar-day-expenses"></div>
+              <p class="calendar-empty" id="calendar-day-empty" hidden>No expenses recorded for this day.</p>
+            </aside>
+          </div>
+          <section class="recurring-patterns" aria-labelledby="recurring-patterns-title">
+            <div class="recurring-patterns-heading">
+              <div>
+                <h3 id="recurring-patterns-title">Recurring spending patterns</h3>
+                <p>Same description and category, similar amounts, repeated on a weekly or monthly cadence.</p>
+              </div>
+            </div>
+            <div class="recurring-pattern-list" id="recurring-pattern-list"></div>
+            <p class="calendar-empty" id="recurring-pattern-empty" hidden>No recurring patterns found yet. Patterns need at least three matching dates.</p>
+          </section>
+        </section>
+
+        <section class="panel budget-panel" id="budgets" aria-labelledby="budget-title">
+          <div class="panel-heading budget-heading">
+            <div>
+              <p class="eyebrow">Plan with confidence</p>
+              <h2 id="budget-title">Monthly budgets</h2>
+              <p class="budget-intro">Set category limits and keep an eye on this month's progress.</p>
+            </div>
+            <label class="budget-month-control" for="budget-month">
+              <span>Budget month</span>
+              <input id="budget-month" type="month" aria-label="Budget month">
+            </label>
+          </div>
+          <div class="budget-alerts" id="budget-alerts" role="status" aria-live="polite" hidden></div>
+          <div class="budget-summary" aria-label="Monthly budget summary">
+            <article class="budget-summary-card">
+              <span>Total budget</span>
+              <strong id="budget-total">—</strong>
+              <small>Across your categories</small>
+            </article>
+            <article class="budget-summary-card">
+              <span>Monthly spending</span>
+              <strong id="budget-spent">—</strong>
+              <small id="budget-spent-caption">All recorded expenses</small>
+            </article>
+            <article class="budget-summary-card remaining-card">
+              <span>Remaining spendable</span>
+              <strong id="budget-remaining">—</strong>
+              <small id="budget-remaining-caption">Budget minus monthly spending</small>
+            </article>
+          </div>
+          <div class="budget-content">
+            <div class="budget-list" id="budget-list"></div>
+            <div class="budget-empty" id="budget-empty" hidden>
+              <strong>No budgets for this month yet</strong>
+              <p>Add a category budget to start tracking your progress.</p>
+            </div>
+            <aside class="budget-form-card">
+              <div class="budget-form-heading">
+                <h3 id="budget-form-title">Set a category budget</h3>
+                <span class="form-mark" aria-hidden="true">◎</span>
+              </div>
+              <p>Budgets are set in the selected display currency and stored in INR.</p>
+              <form id="budget-form">
+                <label class="field-label" for="budget-category">Category <span>*</span></label>
+                <input id="budget-category" name="category" list="budget-category-options" maxlength="50" placeholder="e.g. Food" required>
+                <datalist id="budget-category-options"></datalist>
+                <label class="field-label" for="budget-amount">Monthly limit <span>*</span></label>
+                <div class="amount-input-wrap budget-amount-wrap">
+                  <span id="budget-currency-symbol" aria-hidden="true">₹</span>
+                  <input id="budget-amount" name="amount" type="number" min="0.01" step="0.01" placeholder="0.00" required>
+                </div>
+                <p class="conversion-preview" id="budget-conversion-preview" aria-live="polite"></p>
+                <div class="form-actions">
+                  <button class="primary-button" id="budget-submit" type="submit">Save budget <span aria-hidden="true">→</span></button>
+                  <button class="cancel-button" id="budget-cancel" type="button" hidden>Cancel</button>
+                </div>
+                <p class="form-message" id="budget-message" role="status" aria-live="polite"></p>
+              </form>
+            </aside>
+          </div>
+        </section>
+
+        <section class="panel savings-goals-panel" id="savings-goals" aria-labelledby="savings-goals-title">
+          <div class="panel-heading savings-goals-heading">
+            <div>
+              <p class="eyebrow">Make progress, one step at a time</p>
+              <h2 id="savings-goals-title">Savings goals</h2>
+              <p class="savings-goals-intro">Set a target, track what you have saved, and plan your monthly pace.</p>
+            </div>
+          </div>
+          <div class="savings-goals-message" id="savings-goals-message" role="status" aria-live="polite"></div>
+          <div class="savings-goals-content">
+            <div class="savings-goal-list" id="savings-goal-list"></div>
+            <div class="savings-goals-empty" id="savings-goals-empty" hidden>
+              <strong>No savings goals yet</strong>
+              <p>Create a goal like a laptop or a trip to start tracking your progress.</p>
+            </div>
+            <aside class="savings-goal-form-card">
+              <div class="savings-goal-form-heading">
+                <h3 id="savings-goal-form-title">Create a savings goal</h3>
+                <span class="form-mark" aria-hidden="true">◉</span>
+              </div>
+              <p>Update the saved amount whenever you add to this goal. It is tracked separately from expenses.</p>
+              <form id="savings-goal-form">
+                <label class="field-label" for="savings-goal-name">Goal name <span>*</span></label>
+                <input id="savings-goal-name" name="name" type="text" maxlength="80" placeholder="e.g. New laptop" required>
+                <label class="field-label" for="savings-goal-target">Target amount <span>*</span></label>
+                <div class="amount-input-wrap savings-goal-amount-wrap">
+                  <span id="savings-goal-currency-symbol" aria-hidden="true">₹</span>
+                  <input id="savings-goal-target" name="targetAmount" type="number" min="0.01" step="0.01" placeholder="0.00" required>
+                </div>
+                <label class="field-label" for="savings-goal-saved">Amount saved so far</label>
+                <div class="amount-input-wrap savings-goal-amount-wrap">
+                  <span id="savings-goal-saved-currency-symbol" aria-hidden="true">₹</span>
+                  <input id="savings-goal-saved" name="savedAmount" type="number" min="0" step="0.01" value="0">
+                </div>
+                <label class="field-label" for="savings-goal-deadline">Deadline <span>*</span></label>
+                <input id="savings-goal-deadline" name="deadline" type="date" required>
+                <div class="form-actions">
+                  <button class="primary-button" id="savings-goal-submit" type="submit">Save goal <span aria-hidden="true">→</span></button>
+                  <button class="cancel-button" id="savings-goal-cancel" type="button" hidden>Cancel</button>
+                </div>
+                <p class="form-message" id="savings-goal-form-message" role="status" aria-live="polite"></p>
+              </form>
+            </aside>
+          </div>
+        </section>
+
         <div class="content-grid">
           <section class="panel transactions-panel" id="transactions">
             <div class="panel-heading">
               <div>
-                <p class="eyebrow">YOUR LEDGER</p>
-                <h2>Recent Transactions</h2>
+                <p class="eyebrow">Your ledger</p>
+                <h2>Recent transactions</h2>
               </div>
               <span class="count-pill" id="visible-count">0</span>
             </div>
@@ -111,7 +337,7 @@
             <div class="table-wrap">
               <table>
                 <thead>
-                  <tr><th scope="col">DESCRIPTION</th><th scope="col">CATEGORY</th><th scope="col">DATE</th><th scope="col" class="amount-heading">AMOUNT</th><th scope="col"><span class="sr-only">Actions</span></th></tr>
+                  <tr><th scope="col">Description</th><th scope="col">Category</th><th scope="col">Date</th><th scope="col" class="amount-heading">Amount</th><th scope="col"><span class="sr-only">Actions</span></th></tr>
                 </thead>
                 <tbody id="expense-list"></tbody>
               </table>
@@ -127,8 +353,8 @@
           <aside class="panel form-panel" id="add-expense">
             <div class="panel-heading form-heading">
               <div>
-                <p class="eyebrow">KEEP IT UP TO DATE</p>
-                <h2 id="form-title">Add Expense</h2>
+                <p class="eyebrow">Keep it up to date</p>
+                <h2 id="form-title">Add expense</h2>
               </div>
               <span class="form-mark" aria-hidden="true">＋</span>
             </div>

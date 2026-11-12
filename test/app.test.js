@@ -4,6 +4,9 @@ const os = require("node:os");
 const path = require("node:path");
 const test = require("node:test");
 const { createApp } = require("../server/app");
+const { createSpendingComparison } = require("../server/spending-comparison");
+const { calculateSavingsPlan } = require("../server/savings-goal-plan");
+const { createExpenseCalendar } = require("../server/expense-calendar");
 
 const validExpense = {
   amount: 125.5,
@@ -16,6 +19,8 @@ async function withServer(run, options = {}) {
   const directory = await fs.mkdtemp(path.join(os.tmpdir(), "spendwise-test-"));
   const server = createApp({
     dataFile: path.join(directory, "expenses.json"),
+    budgetsFile: path.join(directory, "budgets.json"),
+    savingsGoalsFile: path.join(directory, "savings-goals.json"),
     ratesFile: path.join(directory, "exchange-rates.json"),
     ...options,
   });
@@ -47,8 +52,39 @@ test("serves the browser app and starts with an empty ledger", async () => {
     const page = await fetch(baseUrl);
     assert.equal(page.status, 200);
     assert.match(page.headers.get("content-type"), /text\/html/);
+    assert.match(await page.text(), /page-route\.js/);
+
+    for (const route of ["/comparison", "/budgets", "/savings-goals", "/calendar"]) {
+      const featurePage = await fetch(`${baseUrl}${route}`);
+      assert.equal(featurePage.status, 200);
+      assert.match(featurePage.headers.get("content-type"), /text\/html/);
+      assert.match(await featurePage.text(), /page-route\.js/);
+    }
+
     const ledger = await fetch(`${baseUrl}/api/expenses`);
     assert.deepEqual(await json(ledger), []);
+  });
+});
+
+test("returns monthly day totals and validates the expense calendar month", async () => {
+  await withServer(async (baseUrl) => {
+    const created = await fetch(`${baseUrl}/api/expenses`, {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify(validExpense),
+    });
+    assert.equal(created.status, 201);
+
+    const response = await fetch(`${baseUrl}/api/expense-calendar?month=2026-11`);
+    assert.equal(response.status, 200);
+    const calendar = await json(response);
+    assert.equal(calendar.month, "2026-11");
+    assert.equal(calendar.totalCents, 12550);
+    assert.equal(calendar.daysInMonth, 30);
+    assert.equal(calendar.days.find((day) => day.date === "2026-11-09").totalCents, 12550);
+
+    const invalid = await fetch(`${baseUrl}/api/expense-calendar?month=2026-13`);
+    assert.equal(invalid.status, 400);
   });
 });
 
@@ -80,6 +116,29 @@ test("creates, updates, lists, and deletes an expense", async () => {
     const deleted = await fetch(`${baseUrl}/api/expenses/${created.id}`, { method: "DELETE" });
     assert.equal(deleted.status, 200);
     assert.deepEqual(await json(await fetch(`${baseUrl}/api/expenses`)), []);
+  });
+});
+
+test("returns a month-over-month comparison from the API", async () => {
+  await withServer(async (baseUrl) => {
+    const created = await fetch(`${baseUrl}/api/expenses`, {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify(validExpense),
+    });
+    assert.equal(created.status, 201);
+
+    const response = await fetch(`${baseUrl}/api/spending-comparison?month=2026-11`);
+    assert.equal(response.status, 200);
+    const comparison = await json(response);
+    assert.equal(comparison.month, "2026-11");
+    assert.equal(comparison.lastMonth, "2026-10");
+    assert.equal(comparison.currentTotalCents, 12550);
+    assert.equal(comparison.previousTotalCents, 0);
+    assert.equal(comparison.isNew, true);
+
+    const invalid = await fetch(`${baseUrl}/api/spending-comparison?month=2026-13`);
+    assert.equal(invalid.status, 400);
   });
 });
 
@@ -175,4 +234,260 @@ test("reports unavailable rates when neither network nor cache is available", as
   }, {
     fetchRates: async () => { throw new Error("offline"); },
   });
+});
+
+test("creates, updates, lists, and deletes monthly category budgets", async () => {
+  await withServer(async (baseUrl) => {
+    const createResponse = await fetch(`${baseUrl}/api/budgets`, {
+      method: "PUT",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({
+        month: "2026-11",
+        category: "Food",
+        amount: 10,
+        currency: "USD",
+      }),
+    });
+    assert.equal(createResponse.status, 200);
+    assert.equal((await json(createResponse)).amount, 1000);
+
+    const updateResponse = await fetch(`${baseUrl}/api/budgets`, {
+      method: "PUT",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({
+        month: "2026-11",
+        category: "food",
+        amount: 1500,
+        currency: "INR",
+      }),
+    });
+    assert.equal(updateResponse.status, 200);
+    assert.equal((await json(updateResponse)).amount, 1500);
+
+    const listed = await fetch(`${baseUrl}/api/budgets?month=2026-11`);
+    const budgets = await json(listed);
+    assert.equal(budgets.length, 1);
+    assert.equal(budgets[0].amount, 1500);
+
+    const anotherMonth = await fetch(`${baseUrl}/api/budgets?month=2026-12`);
+    assert.deepEqual(await json(anotherMonth), []);
+
+    const deleted = await fetch(
+      `${baseUrl}/api/budgets?month=2026-11&category=${encodeURIComponent("FOOD")}`,
+      { method: "DELETE" },
+    );
+    assert.equal(deleted.status, 200);
+    assert.deepEqual(await json(await fetch(`${baseUrl}/api/budgets?month=2026-11`)), []);
+  }, { fetchRates: async () => rateResponse() });
+});
+
+test("rejects malformed monthly budgets and returns not found for missing budgets", async () => {
+  await withServer(async (baseUrl) => {
+    const invalidMonth = await fetch(`${baseUrl}/api/budgets`, {
+      method: "PUT",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({ month: "2026-13", category: "Food", amount: 100 }),
+    });
+    assert.equal(invalidMonth.status, 400);
+
+    const invalidAmount = await fetch(`${baseUrl}/api/budgets`, {
+      method: "PUT",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({ month: "2026-11", category: "Food", amount: 0 }),
+    });
+    assert.equal(invalidAmount.status, 400);
+
+    const missing = await fetch(
+      `${baseUrl}/api/budgets?month=2026-11&category=Food`,
+      { method: "DELETE" },
+    );
+    assert.equal(missing.status, 404);
+  });
+});
+
+test("creates, updates, lists, and deletes savings goals", async () => {
+  await withServer(async (baseUrl) => {
+    const createResponse = await fetch(`${baseUrl}/api/savings-goals`, {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({
+        name: "Laptop",
+        targetAmount: 1200,
+        savedAmount: 250,
+        deadline: "2027-06-30",
+      }),
+    });
+    assert.equal(createResponse.status, 201);
+    const created = await json(createResponse);
+    assert.equal(created.name, "Laptop");
+    assert.equal(created.targetAmount, 1200);
+    assert.equal(created.savedAmount, 250);
+    assert.ok(created.id);
+    assert.ok(created.createdAt);
+
+    const listed = await fetch(`${baseUrl}/api/savings-goals`);
+    assert.equal((await json(listed)).length, 1);
+
+    const updateResponse = await fetch(`${baseUrl}/api/savings-goals/${created.id}`, {
+      method: "PUT",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({
+        name: "Laptop",
+        targetAmount: 1200,
+        savedAmount: 400,
+        deadline: "2027-06-30",
+      }),
+    });
+    assert.equal(updateResponse.status, 200);
+    assert.equal((await json(updateResponse)).savedAmount, 400);
+
+    const deleteResponse = await fetch(`${baseUrl}/api/savings-goals/${created.id}`, {
+      method: "DELETE",
+    });
+    assert.equal(deleteResponse.status, 200);
+    assert.deepEqual(await json(await fetch(`${baseUrl}/api/savings-goals`)), []);
+  });
+});
+
+test("validates savings goal amounts and dates and converts non-INR values", async () => {
+  await withServer(async (baseUrl) => {
+    const invalid = await fetch(`${baseUrl}/api/savings-goals`, {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({
+        name: "Laptop",
+        targetAmount: 100,
+        savedAmount: 101,
+        deadline: "2027-02-29",
+      }),
+    });
+    assert.equal(invalid.status, 400);
+
+    const convertedResponse = await fetch(`${baseUrl}/api/savings-goals`, {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({
+        name: "Laptop",
+        targetAmount: 10,
+        savedAmount: 5,
+        currency: "USD",
+        deadline: "2027-06-30",
+      }),
+    });
+    assert.equal(convertedResponse.status, 201);
+    const converted = await json(convertedResponse);
+    assert.equal(converted.targetAmount, 1000);
+    assert.equal(converted.savedAmount, 500);
+  }, { fetchRates: async () => rateResponse() });
+});
+
+test("calculates monthly savings across calendar months and handles completed or overdue goals", () => {
+  const active = calculateSavingsPlan({
+    targetAmount: 1200,
+    savedAmount: 400,
+    deadline: "2027-03-31",
+  }, "2026-11-12");
+  assert.deepEqual(active, {
+    status: "active",
+    monthsRemaining: 5,
+    monthlyCents: 16000,
+  });
+
+  const roundedUp = calculateSavingsPlan({
+    targetAmount: 10.01,
+    savedAmount: 0,
+    deadline: "2027-01-31",
+  }, "2026-11-12");
+  assert.equal(roundedUp.monthsRemaining, 3);
+  assert.equal(roundedUp.monthlyCents, 334);
+
+  const completed = calculateSavingsPlan({
+    targetAmount: 1200,
+    savedAmount: 1200,
+    deadline: "2027-03-31",
+  }, "2026-11-12");
+  assert.equal(completed.status, "reached");
+  assert.equal(completed.monthlyCents, 0);
+
+  const overdue = calculateSavingsPlan({
+    targetAmount: 1200,
+    savedAmount: 400,
+    deadline: "2026-11-11",
+  }, "2026-11-12");
+  assert.equal(overdue.status, "overdue");
+  assert.equal(overdue.monthlyCents, null);
+});
+
+test("compares adjacent months and identifies category changes and unusual expenses", () => {
+  const expenses = [
+    { id: "food-old", amount: 100, category: "Food", date: "2025-12-10", description: "Groceries" },
+    { id: "food-current-b", amount: 100, category: "Food", date: "2026-01-05", description: "Groceries" },
+    { id: "food-current-outlier", amount: 200, category: "Food", date: "2026-01-08", description: "Dinner" },
+    { id: "transport-new", amount: 40, category: "Transport", date: "2026-01-09", description: "Taxi" },
+    { id: "health-old", amount: 80, category: "Health", date: "2025-12-12", description: "Medicine" },
+  ];
+
+  const comparison = createSpendingComparison(expenses, "2026-01");
+  assert.equal(comparison.lastMonth, "2025-12");
+  assert.equal(comparison.previousTotalCents, 18000);
+  assert.equal(comparison.currentTotalCents, 34000);
+  assert.equal(comparison.changePercent, 89);
+  assert.equal(comparison.isNew, false);
+
+  const transport = comparison.categories.find((category) => category.category === "Transport");
+  assert.equal(transport.isNew, true);
+  assert.equal(transport.changePercent, null);
+
+  const health = comparison.categories.find((category) => category.category === "Health");
+  assert.equal(health.changePercent, -100);
+  assert.equal(health.trend, "decreased");
+
+  assert.deepEqual(comparison.unusualExpenses.map((expense) => expense.id), ["food-current-outlier"]);
+  assert.equal(comparison.unusualExpenses[0].medianCents, 10000);
+  assert.equal(comparison.unusualExpenses[0].multiple, 2);
+});
+
+test("compares percentages against zero spending as new spending", () => {
+  const comparison = createSpendingComparison([
+    { id: "new", amount: 25, category: "Food", date: "2026-03-01", description: "Lunch" },
+  ], "2026-03");
+
+  assert.equal(comparison.lastMonth, "2026-02");
+  assert.equal(comparison.previousTotalCents, 0);
+  assert.equal(comparison.currentTotalCents, 2500);
+  assert.equal(comparison.changePercent, null);
+  assert.equal(comparison.isNew, true);
+});
+
+test("highlights days above the monthly average and recognizes weekly and monthly patterns", () => {
+  const expenses = [
+    { amount: 10, category: "Coffee", date: "2024-02-01", description: "Daily brew" },
+    { amount: 1000, category: "Coffee", date: "2024-02-29", description: "Daily brew" },
+    { amount: 100, category: "Coffee", date: "2024-01-01", description: "Daily brew" },
+    { amount: 110, category: "Coffee", date: "2024-01-08", description: "Daily  brew" },
+    { amount: 90, category: "Coffee", date: "2024-01-15", description: "Daily brew" },
+    { amount: 200, category: "Bills", date: "2023-11-30", description: "Cloud plan" },
+    { amount: 210, category: "Bills", date: "2023-12-30", description: "Cloud plan" },
+    { amount: 190, category: "Bills", date: "2024-01-30", description: "Cloud plan" },
+    { amount: 300, category: "Bills", date: "2024-02-01", description: "Annual fee" },
+  ];
+
+  const calendar = createExpenseCalendar(expenses, "2024-02");
+  assert.equal(calendar.daysInMonth, 29);
+  assert.equal(calendar.totalCents, 131000);
+  assert.equal(calendar.highSpendingThresholdCents, 6776);
+  assert.equal(calendar.highSpendingDayCount, 2);
+  assert.equal(calendar.days.find((day) => day.date === "2024-02-01").highSpending, true);
+  assert.equal(calendar.days.find((day) => day.date === "2024-02-29").highSpending, true);
+  assert.equal(calendar.days.find((day) => day.date === "2024-02-02").highSpending, false);
+
+  const patterns = calendar.recurringPatterns;
+  assert.equal(patterns.length, 2);
+  assert.deepEqual(
+    patterns.map(({ description, cadence, occurrenceCount }) => ({ description, cadence, occurrenceCount })),
+    [
+      { description: "Cloud plan", cadence: "monthly", occurrenceCount: 3 },
+      { description: "Daily brew", cadence: "weekly", occurrenceCount: 3 },
+    ],
+  );
 });
