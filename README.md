@@ -21,13 +21,13 @@ SpendWise is a local-first expense tracker for recording everyday purchases, rev
 
 ## Features
 
-**Expense tracking**
+### Expense tracking
 
 - Add, edit, and delete expenses with an amount, category, date, and optional description.
 - Search by description, category, or date; filter by category and month.
 - Review dated expenses and totals for the current month and all recorded spending.
 
-**Insights and budgets**
+### Insights and budgets
 
 - Compare the current month with the previous month, including category-level changes and percentages.
 - Flag unusually large expenses when an amount is at least twice the category median, provided there are at least three expenses in the comparison period.
@@ -35,7 +35,7 @@ SpendWise is a local-first expense tracker for recording everyday purchases, rev
 - See the remaining monthly balance across all category budgets.
 - View a monthly calendar with daily totals and high-spending days; identify possible weekly or monthly recurring expenses from transaction history.
 
-**Savings and currency**
+### Savings and currency
 
 - Create savings goals with a target and deadline, update the saved amount, and track progress and the monthly saving pace.
 - Use INR, USD, EUR, GBP, or NPR for display and expense entry. Values are stored in INR.
@@ -141,7 +141,7 @@ Rates are indicative, not a quote for a financial transaction. Existing expenses
 All endpoints are served from the same origin as the browser UI.
 
 | Method | Path | Description |
-|---|---|---|
+| --- | --- | --- |
 | `GET` | `/api/expenses` | List expenses; amounts are returned in INR |
 | `GET` | `/api/spending-comparison?month=YYYY-MM` | Compare a month with the previous month |
 | `GET` | `/api/expense-calendar?month=YYYY-MM` | Get daily totals, high-spending days, and recurring patterns |
