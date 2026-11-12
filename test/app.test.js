@@ -7,6 +7,8 @@ const { createApp } = require("../server/app");
 const { createSpendingComparison } = require("../server/spending-comparison");
 const { calculateSavingsPlan } = require("../server/savings-goal-plan");
 const { createExpenseCalendar } = require("../server/expense-calendar");
+const { createExpenseForecast } = require("../server/expense-forecast");
+const { answerFinancialQuestion } = require("../server/financial-assistant");
 
 const validExpense = {
   amount: 125.5,
@@ -54,7 +56,7 @@ test("serves the browser app and starts with an empty ledger", async () => {
     assert.match(page.headers.get("content-type"), /text\/html/);
     assert.match(await page.text(), /page-route\.js/);
 
-    for (const route of ["/comparison", "/budgets", "/savings-goals", "/calendar"]) {
+    for (const route of ["/comparison", "/forecasting", "/assistant", "/budgets", "/savings-goals", "/calendar"]) {
       const featurePage = await fetch(`${baseUrl}${route}`);
       assert.equal(featurePage.status, 200);
       assert.match(featurePage.headers.get("content-type"), /text\/html/);
@@ -64,6 +66,148 @@ test("serves the browser app and starts with an empty ledger", async () => {
     const ledger = await fetch(`${baseUrl}/api/expenses`);
     assert.deepEqual(await json(ledger), []);
   });
+});
+
+test("answers monthly category, previous-week category, and spending-reduction questions", () => {
+  const expenses = [
+    { amount: 25, category: "Food", date: "2026-11-02" },
+    { amount: 10, category: "Food", date: "2026-11-07" },
+    { amount: 4, category: "Food", date: "2026-11-08" },
+    { amount: 40, category: "Health", date: "2026-11-10" },
+    { amount: 99, category: "Food", date: "2026-11-20" },
+    { amount: 20, category: "Utilities", date: "2026-10-10" },
+  ];
+  const now = new Date(2026, 10, 12, 12);
+
+  const monthly = answerFinancialQuestion("Where did most of my money go this month?", expenses, now);
+  assert.equal(monthly.intent, "monthly-highest");
+  assert.equal(monthly.totalCents, 7900);
+  assert.equal(monthly.categories[0].category, "Health");
+  assert.equal(monthly.categories[0].amountCents, 4000);
+
+  const weekly = answerFinancialQuestion("How much did I spend on food last week?", expenses, now);
+  assert.equal(weekly.intent, "weekly-category");
+  assert.equal(weekly.category, "Food");
+  assert.equal(weekly.fromDate, "2026-11-02");
+  assert.equal(weekly.toDate, "2026-11-08");
+  assert.equal(weekly.amountCents, 3900);
+  assert.equal(weekly.expenseCount, 3);
+
+  const reduction = answerFinancialQuestion("How can I reduce my expenses?", expenses, now);
+  assert.equal(reduction.intent, "expense-reduction");
+  assert.deepEqual(reduction.categories.map((category) => category.category), ["Health", "Food"]);
+
+  assert.equal(answerFinancialQuestion("What is my account balance?", expenses, now).intent, "unsupported");
+});
+
+test("answers financial assistant requests locally and validates question length", async () => {
+  await withServer(async (baseUrl) => {
+    await fetch(`${baseUrl}/api/expenses`, {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({ ...validExpense, amount: 30, date: "2026-11-10", category: "Health" }),
+    });
+    const response = await fetch(`${baseUrl}/api/financial-assistant`, {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({ question: "Where did most of my money go this month?" }),
+    });
+    assert.equal(response.status, 200);
+    const answer = await json(response);
+    assert.equal(answer.intent, "monthly-highest");
+    assert.equal(answer.categories[0].category, "Health");
+
+    const invalid = await fetch(`${baseUrl}/api/financial-assistant`, {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({ question: "a".repeat(301) }),
+    });
+    assert.equal(invalid.status, 400);
+  }, { now: () => new Date(2026, 10, 12, 12) });
+});
+
+test("forecasts category spending from history and estimates budget headroom", () => {
+  const forecast = createExpenseForecast(
+    [
+      { amount: 31, category: "Food", date: "2026-10-10" },
+      { amount: 5, category: "Food", date: "2026-11-02" },
+    ],
+    [{ amount: 30, category: "Food" }],
+    new Date(2026, 10, 12, 12),
+  );
+
+  assert.equal(forecast.month, "2026-11");
+  assert.equal(forecast.actualCents, 500);
+  assert.equal(forecast.projectedCents, 2300);
+  assert.equal(forecast.historicalMonths.length, 1);
+  assert.equal(forecast.categories[0].projectedCents, 2300);
+  assert.equal(forecast.potentialSavingsCents, 700);
+  assert.equal(forecast.budgetOverageCents, 0);
+});
+
+test("uses current-month pace when history is unavailable and withholds savings without a usable estimate", () => {
+  const currentPace = createExpenseForecast(
+    [{ amount: 12.5, category: "Food", date: "2026-11-12" }],
+    [],
+    new Date(2026, 10, 12, 12),
+  );
+  assert.equal(currentPace.method, "current-pace");
+  assert.equal(currentPace.projectedCents, 3125);
+  assert.equal(currentPace.potentialSavingsCents, null);
+
+  const noHistory = createExpenseForecast(
+    [],
+    [{ amount: 30, category: "Food" }],
+    new Date(2026, 10, 12, 12),
+  );
+  assert.equal(noHistory.method, "insufficient-data");
+  assert.equal(noHistory.potentialSavingsCents, null);
+});
+
+test("does not extend a category's current-month pace when prior-month history exists but the category is new", () => {
+  const forecast = createExpenseForecast(
+    [
+      { amount: 31, category: "Food", date: "2026-10-10" },
+      { amount: 5, category: "Food", date: "2026-11-02" },
+      { amount: 20, category: "Utilities", date: "2026-11-12" },
+    ],
+    [],
+    new Date(2026, 10, 12, 12),
+  );
+
+  const utilities = forecast.categories.find((category) => category.category === "Utilities");
+  assert.equal(utilities.projectedCents, 2000);
+  assert.equal(forecast.projectedCents, 4300);
+});
+
+test("serves the current-month expense forecast using expenses and budgets", async () => {
+  await withServer(async (baseUrl) => {
+    for (const expense of [
+      { ...validExpense, amount: 31, date: "2026-10-10" },
+      { ...validExpense, amount: 5, date: "2026-11-02" },
+    ]) {
+      const created = await fetch(`${baseUrl}/api/expenses`, {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify(expense),
+      });
+      assert.equal(created.status, 201);
+    }
+
+    const savedBudget = await fetch(`${baseUrl}/api/budgets`, {
+      method: "PUT",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({ month: "2026-11", category: "Food", amount: 30 }),
+    });
+    assert.equal(savedBudget.status, 200);
+
+    const response = await fetch(`${baseUrl}/api/expense-forecast`);
+    assert.equal(response.status, 200);
+    const forecast = await json(response);
+    assert.equal(forecast.month, "2026-11");
+    assert.equal(forecast.projectedCents, 2300);
+    assert.equal(forecast.potentialSavingsCents, 700);
+  }, { now: () => new Date(2026, 10, 12, 12) });
 });
 
 test("returns monthly day totals and validates the expense calendar month", async () => {
@@ -444,6 +588,7 @@ test("compares adjacent months and identifies category changes and unusual expen
 
   assert.deepEqual(comparison.unusualExpenses.map((expense) => expense.id), ["food-current-outlier"]);
   assert.equal(comparison.unusualExpenses[0].medianCents, 10000);
+  assert.equal(comparison.unusualExpenses[0].sampleSize, 3);
   assert.equal(comparison.unusualExpenses[0].multiple, 2);
 });
 

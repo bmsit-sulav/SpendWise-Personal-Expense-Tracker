@@ -22,9 +22,11 @@ app = Flask(
 
 @app.get("/")
 @app.get("/comparison")
+@app.get("/forecasting")
 @app.get("/budgets")
 @app.get("/savings-goals")
 @app.get("/calendar")
+@app.get("/assistant")
 def index():
     return render_template("index.html")
 

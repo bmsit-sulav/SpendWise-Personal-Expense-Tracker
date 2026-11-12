@@ -8,6 +8,9 @@ const categoryInput = document.querySelector("#category-input");
 const dateInput = document.querySelector("#date-input");
 const descriptionInput = document.querySelector("#description-input");
 const list = document.querySelector("#expense-list");
+const ledgerTableWrap = document.querySelector(".table-wrap");
+const ledgerScrollLeftButton = document.querySelector("#ledger-scroll-left");
+const ledgerScrollRightButton = document.querySelector("#ledger-scroll-right");
 const emptyState = document.querySelector("#empty-state");
 const formMessage = document.querySelector("#form-message");
 const submitButton = document.querySelector("#submit-button");
@@ -28,6 +31,11 @@ const savingsGoalSavedInput = document.querySelector("#savings-goal-saved");
 const savingsGoalDeadlineInput = document.querySelector("#savings-goal-deadline");
 const savingsGoalSubmitButton = document.querySelector("#savings-goal-submit");
 const savingsGoalCancelButton = document.querySelector("#savings-goal-cancel");
+const assistantForm = document.querySelector("#assistant-form");
+const assistantQuestionInput = document.querySelector("#assistant-question");
+const assistantSubmitButton = document.querySelector("#assistant-submit");
+const assistantConversation = document.querySelector("#assistant-conversation");
+const assistantStatus = document.querySelector("#assistant-status");
 
 const page = window.location.hash === "#transactions"
   ? "transactions"
@@ -36,6 +44,8 @@ const pageLabels = {
   home: "Overview",
   transactions: "Transactions",
   comparison: "Spending comparison",
+  forecasting: "Expense forecasting",
+  assistant: "AI Financial Assistance",
   budgets: "Budgets",
   "savings-goals": "Savings goals",
   calendar: "Expense calendar",
@@ -52,6 +62,8 @@ let expenses = [];
 let budgets = [];
 let savingsGoals = [];
 let spendingComparison = null;
+let expenseForecast = null;
+let expenseForecastError = "";
 let expenseCalendar = null;
 let selectedCalendarDate = localDateValue();
 let editingId = null;
@@ -209,12 +221,27 @@ function renderExpenses() {
     row.append(actions);
     list.append(row);
   }
+  updateLedgerScrollButtons();
+}
+
+function updateLedgerScrollButtons() {
+  const maxScroll = ledgerTableWrap.scrollWidth - ledgerTableWrap.clientWidth;
+  ledgerScrollLeftButton.disabled = ledgerTableWrap.scrollLeft <= 0;
+  ledgerScrollRightButton.disabled = ledgerTableWrap.scrollLeft >= maxScroll - 1;
+}
+
+function scrollLedger(direction) {
+  ledgerTableWrap.scrollBy({
+    left: direction * Math.max(180, ledgerTableWrap.clientWidth * 0.8),
+    behavior: "smooth",
+  });
 }
 
 function render() {
   renderSummary();
   renderExpenses();
   renderComparison();
+  renderExpenseForecast();
   renderBudgets();
   renderSavingsGoals();
   renderExpenseCalendar();
@@ -405,6 +432,207 @@ async function loadSpendingComparison() {
   }
 }
 
+function renderExpenseForecast() {
+  const forecast = expenseForecast;
+  const categoryList = document.querySelector("#forecast-category-list");
+  categoryList.replaceChildren();
+  document.querySelector("#forecast-message").textContent = expenseForecastError;
+  document.querySelector("#forecast-period").textContent = comparisonMonthLabel(
+    forecast?.month || localDateValue().slice(0, 7),
+  );
+
+  if (!forecast) {
+    document.querySelector("#forecast-total").textContent = "—";
+    document.querySelector("#forecast-actual").textContent = "—";
+    document.querySelector("#forecast-savings").textContent = "—";
+    document.querySelector("#forecast-method").textContent = expenseForecastError
+      ? ""
+      : "Loading your spending history…";
+    document.querySelector("#forecast-empty").hidden = true;
+    return;
+  }
+
+  const hasEstimate = forecast.method !== "insufficient-data";
+  document.querySelector("#forecast-total").textContent = hasEstimate
+    ? formatDisplayCents(forecast.projectedCents)
+    : "—";
+  document.querySelector("#forecast-actual").textContent = hasEstimate
+    ? formatDisplayCents(forecast.actualCents)
+    : "—";
+  document.querySelector("#forecast-savings").textContent =
+    forecast.potentialSavingsCents === null
+      ? "—"
+      : formatDisplayCents(forecast.potentialSavingsCents);
+  document.querySelector("#forecast-total-caption").textContent =
+    `${forecast.remainingDays} days remaining in ${comparisonMonthLabel(forecast.month)}`;
+  document.querySelector("#forecast-days-caption").textContent =
+    `Recorded through day ${forecast.elapsedDays} of ${forecast.daysInMonth}`;
+  document.querySelector("#forecast-savings-caption").textContent = forecast.totalBudgetCents === null
+    ? "Set monthly category budgets to estimate budget headroom."
+    : forecast.method === "insufficient-data"
+      ? "More spending history is needed for a savings estimate."
+      : forecast.budgetOverageCents > 0
+        ? `Forecast is ${formatDisplayCents(forecast.budgetOverageCents)} above your combined budgets.`
+        : "Estimated budget remaining after projected spending.";
+
+  document.querySelector("#forecast-method").textContent = forecast.method === "historical-average"
+    ? `Estimate uses average daily spending from ${forecast.historicalMonths.length} recent tracked month${forecast.historicalMonths.length === 1 ? "" : "s"}, plus actual spending so far.`
+    : forecast.method === "current-pace"
+      ? "Limited history: the current month's daily spending pace is extended across the remaining days."
+      : "There is not enough recorded spending to estimate this month's total yet.";
+  document.querySelector("#forecast-note").textContent = forecast.method === "historical-average"
+    ? `The estimate adds actual spending through day ${forecast.elapsedDays} to projected spending for the remaining ${forecast.remainingDays} days, using recent tracked history.`
+    : forecast.method === "current-pace"
+      ? `There are no recent tracked months to use as a baseline, so the estimate extends this month's daily pace across ${forecast.remainingDays} remaining days.`
+      : "Record expenses to create a forecast. When history is available, the estimate uses recent daily spending rates.";
+  document.querySelector("#forecast-empty").hidden = hasEstimate;
+  if (!hasEstimate) return;
+
+  for (const category of forecast.categories) {
+    const item = document.createElement("article");
+    item.className = "forecast-category";
+    const heading = document.createElement("div");
+    heading.className = "forecast-category-heading";
+    const name = document.createElement("strong");
+    name.textContent = category.category;
+    const projected = document.createElement("span");
+    projected.textContent = formatDisplayCents(category.projectedCents);
+    heading.append(name, projected);
+
+    const details = document.createElement("div");
+    details.className = "forecast-category-details";
+    const actual = document.createElement("span");
+    actual.textContent = `Actual so far: ${formatDisplayCents(category.actualCents)}`;
+    const budget = document.createElement("span");
+    budget.textContent = category.budgetCents === null
+      ? "No budget"
+      : `Budget: ${formatDisplayCents(category.budgetCents)}`;
+    details.append(actual, budget);
+
+    const track = document.createElement("div");
+    track.className = "forecast-category-track";
+    track.setAttribute("aria-hidden", "true");
+    const fill = document.createElement("span");
+    fill.style.width = forecast.projectedCents > 0
+      ? `${Math.min(100, (category.projectedCents / forecast.projectedCents) * 100)}%`
+      : "0%";
+    track.append(fill);
+    item.append(heading, details, track);
+    categoryList.append(item);
+  }
+}
+
+async function loadExpenseForecast() {
+  try {
+    expenseForecast = await request("/api/expense-forecast");
+    expenseForecastError = "";
+  } catch (error) {
+    expenseForecast = null;
+    expenseForecastError = `Could not load expense forecast: ${error.message}`;
+  }
+  renderExpenseForecast();
+}
+
+function formatFinancialAssistantAnswer(result) {
+  if (result.intent === "monthly-highest") {
+    if (result.categories.length === 0) {
+      return `There are no expenses recorded for ${comparisonMonthLabel(result.month)} yet.`;
+    }
+    const [topCategory, ...otherCategories] = result.categories;
+    const share = Math.round((topCategory.amountCents / result.totalCents) * 100);
+    const otherSpending = otherCategories.slice(0, 2)
+      .map((category) => `${category.category}: ${formatDisplayCents(category.amountCents)}`)
+      .join("; ");
+    return `Most of your recorded ${comparisonMonthLabel(result.month)} spending went to ${topCategory.category}: ${formatDisplayCents(topCategory.amountCents)} (${share}% of ${formatDisplayCents(result.totalCents)} total).${otherSpending ? ` Next highest: ${otherSpending}.` : ""}`;
+  }
+
+  if (result.intent === "weekly-category") {
+    const dateRange = `${formatDate(result.fromDate)}–${formatDate(result.toDate)}`;
+    return result.expenseCount === 0
+      ? `I found no recorded ${result.category} expenses for last week (${dateRange}).`
+      : `You spent ${formatDisplayCents(result.amountCents)} on ${result.category} last week (${dateRange}), across ${result.expenseCount} expense${result.expenseCount === 1 ? "" : "s"}.`;
+  }
+
+  if (result.intent === "weekly-category-required") {
+    return "Which category should I check? For example: “How much did I spend on food last week?”";
+  }
+
+  if (result.intent === "expense-reduction") {
+    if (result.categories.length === 0) {
+      return `There are no expenses recorded for ${comparisonMonthLabel(result.month)} yet. Add expenses and I can highlight the largest areas to review.`;
+    }
+    const categorySummary = result.categories
+      .map((category) => `${category.category}: ${formatDisplayCents(category.amountCents)}`)
+      .join("; ");
+    const tips = result.categories.slice(0, 2)
+      .map((category) => `${category.category}: ${financialAssistantTip(category.category)}`)
+      .join(" ");
+    return `Your largest recorded categories for ${comparisonMonthLabel(result.month)} are ${categorySummary}. To look for reductions, start by reviewing optional or recurring purchases. ${tips} Avoid cutting essential care, housing, or safety costs.`;
+  }
+
+  return "I can answer questions about your largest spending category this month, a category's spending last week, or areas to review for possible reductions. Try one of the suggested questions.";
+}
+
+function financialAssistantTip(category) {
+  const tips = {
+    entertainment: "review subscriptions and consider a limit for discretionary activities.",
+    food: "plan meals and review repeated takeout, delivery, or coffee purchases.",
+    health: "check for duplicate or optional purchases, but do not skip necessary care.",
+    housing: "review optional home services or recurring fees while protecting essential housing.",
+    other: "review and recategorize transactions to make repeat costs easier to spot.",
+    shopping: "use a planned list and consider delaying non-urgent purchases.",
+    transport: "combine errands and compare lower-cost travel options that fit your routine.",
+    utilities: "check usage and recurring service plans for options you no longer need.",
+  };
+  return tips[category.toLocaleLowerCase()] ||
+    "review repeat and non-essential purchases in this category.";
+}
+
+function appendAssistantTurn(question) {
+  const userTurn = document.createElement("article");
+  userTurn.className = "assistant-turn user";
+  const questionText = document.createElement("p");
+  questionText.textContent = question;
+  userTurn.append(questionText);
+
+  const answerTurn = document.createElement("article");
+  answerTurn.className = "assistant-turn assistant-reply";
+  const answerText = document.createElement("p");
+  answerText.textContent = "Checking your local spending data…";
+  answerTurn.append(answerText);
+  assistantConversation.append(userTurn, answerTurn);
+  assistantConversation.scrollTop = assistantConversation.scrollHeight;
+  return { answerTurn, answerText };
+}
+
+async function askFinancialAssistant(question) {
+  const trimmedQuestion = question.trim();
+  if (!trimmedQuestion || assistantSubmitButton.disabled) return;
+
+  const { answerTurn, answerText } = appendAssistantTurn(trimmedQuestion);
+  assistantQuestionInput.value = "";
+  assistantSubmitButton.disabled = true;
+  for (const prompt of document.querySelectorAll(".assistant-prompt")) prompt.disabled = true;
+  assistantStatus.textContent = "Checking your local spending data…";
+
+  try {
+    const result = await request("/api/financial-assistant", {
+      method: "POST",
+      body: JSON.stringify({ question: trimmedQuestion }),
+    });
+    answerText.textContent = formatFinancialAssistantAnswer(result);
+  } catch (error) {
+    answerTurn.classList.add("error");
+    answerText.textContent = `I couldn't answer that: ${error.message}`;
+  } finally {
+    assistantSubmitButton.disabled = false;
+    for (const prompt of document.querySelectorAll(".assistant-prompt")) prompt.disabled = false;
+    assistantStatus.textContent = "";
+    assistantConversation.scrollTop = assistantConversation.scrollHeight;
+    assistantQuestionInput.focus();
+  }
+}
+
 function selectedCalendarMonth() {
   return calendarMonthInput.value || localDateValue().slice(0, 7);
 }
@@ -480,16 +708,9 @@ function renderExpenseCalendar() {
     button.addEventListener("click", () => {
       selectedCalendarDate = day.date;
       renderExpenseCalendar();
+      const selectedDayCard = document.querySelector(".calendar-day-card");
       if (!window.matchMedia("(prefers-reduced-motion: reduce)").matches) {
-        document.querySelector(".calendar-day.selected").animate(
-          [
-            { transform: "scale(1)" },
-            { transform: "scale(1.045)" },
-            { transform: "scale(1)" },
-          ],
-          { duration: 250, easing: "cubic-bezier(0.2, 0.7, 0.2, 1)" },
-        );
-        document.querySelector(".calendar-day-card").animate(
+        selectedDayCard.animate(
           [
             { opacity: 0, transform: "translateY(8px) scale(0.985)" },
             { opacity: 1, transform: "translateY(0) scale(1)" },
@@ -906,6 +1127,7 @@ async function deleteBudget(budget) {
     }
     renderBudgets();
     showBudgetMessage("Budget deleted.");
+    await loadExpenseForecast();
   } catch (error) {
     showBudgetMessage(error.message, true);
   }
@@ -921,6 +1143,7 @@ async function deleteExpense(expense) {
     render();
     await loadSpendingComparison();
     await loadExpenseCalendar();
+    await loadExpenseForecast();
   } catch (error) {
     showMessage(error.message, true);
   }
@@ -954,6 +1177,7 @@ form.addEventListener("submit", async (event) => {
     render();
     await loadSpendingComparison();
     await loadExpenseCalendar();
+    await loadExpenseForecast();
     showMessage("Expense saved.");
   } catch (error) {
     showMessage(error.message, true);
@@ -1000,6 +1224,7 @@ budgetForm.addEventListener("submit", async (event) => {
     resetBudgetForm();
     renderBudgets();
     showBudgetMessage("Budget saved.");
+    await loadExpenseForecast();
   } catch (error) {
     showBudgetMessage(error.message, true);
   } finally {
@@ -1053,6 +1278,19 @@ document.querySelector("#clear-filters").addEventListener("click", () => {
   document.querySelector("#month-filter").value = "";
   renderExpenses();
 });
+assistantForm.addEventListener("submit", (event) => {
+  event.preventDefault();
+  void askFinancialAssistant(assistantQuestionInput.value);
+});
+for (const prompt of document.querySelectorAll(".assistant-prompt")) {
+  prompt.addEventListener("click", () => {
+    void askFinancialAssistant(prompt.dataset.assistantQuestion || "");
+  });
+}
+ledgerTableWrap.addEventListener("scroll", updateLedgerScrollButtons, { passive: true });
+ledgerScrollLeftButton.addEventListener("click", () => scrollLedger(-1));
+ledgerScrollRightButton.addEventListener("click", () => scrollLedger(1));
+window.addEventListener("resize", updateLedgerScrollButtons);
 if (!SUPPORTED_CURRENCIES.includes(currency)) currency = "INR";
 currencySelect.value = currency;
 currency = currencySelect.value;
@@ -1089,6 +1327,7 @@ currencySelect.addEventListener("change", () => {
 amountInput.addEventListener("input", updateConversionPreview);
 loadBudgets();
 loadExpenseCalendar();
+loadExpenseForecast();
 document.querySelector("#currency-symbol").textContent = CURRENCY_SYMBOLS[currency];
 document.querySelector("#today-label").textContent = new Intl.DateTimeFormat(undefined, {
   weekday: "long",

@@ -22,6 +22,8 @@
           <a class="nav-link" data-page="home" href="/"><span class="nav-icon" aria-hidden="true">◫</span>Overview</a>
           <a class="nav-link" data-page="transactions" href="/#transactions"><span class="nav-icon" aria-hidden="true">↗</span>Transactions</a>
           <a class="nav-link" data-page="comparison" href="/comparison"><span class="nav-icon" aria-hidden="true">↕</span>Spending comparison</a>
+          <a class="nav-link" data-page="forecasting" href="/forecasting"><span class="nav-icon" aria-hidden="true">◷</span>Expense forecasting</a>
+          <a class="nav-link" data-page="assistant" href="/assistant"><span class="nav-icon" aria-hidden="true">✦</span>AI Financial Assistance</a>
           <a class="nav-link" data-page="budgets" href="/budgets"><span class="nav-icon" aria-hidden="true">◎</span>Budgets</a>
           <a class="nav-link" data-page="savings-goals" href="/savings-goals"><span class="nav-icon" aria-hidden="true">◉</span>Savings goals</a>
           <a class="nav-link" data-page="calendar" href="/calendar"><span class="nav-icon" aria-hidden="true">▦</span>Expense calendar</a>
@@ -106,6 +108,7 @@
               <small id="comparison-change-caption">Compared with last month</small>
             </article>
           </div>
+          <div class="comparison-alerts" id="comparison-alerts" role="status" aria-live="polite" aria-atomic="false" hidden></div>
           <div class="comparison-details">
             <section class="comparison-card" aria-labelledby="category-changes-title">
               <div class="comparison-card-heading">
@@ -128,6 +131,83 @@
               <p class="comparison-empty" id="unusual-expense-empty" hidden>No unusual expenses identified for these months.</p>
             </section>
           </div>
+        </section>
+
+        <section class="panel forecasting-panel" id="forecasting" aria-labelledby="forecast-title">
+          <div class="panel-heading forecasting-heading">
+            <div>
+              <p class="eyebrow">LOOK AHEAD</p>
+              <h2 id="forecast-title">Expense forecasting</h2>
+              <p class="forecast-intro">Estimate this month's spending from your recent recorded history.</p>
+            </div>
+            <span class="forecast-period" id="forecast-period">—</span>
+          </div>
+          <p class="forecast-message" id="forecast-message" role="status" aria-live="polite"></p>
+          <div class="forecast-summary" aria-label="Month-end forecast summary">
+            <article class="forecast-stat">
+              <span>Expected monthly expenditure</span>
+              <strong id="forecast-total">—</strong>
+              <small id="forecast-total-caption">Estimated month-end total</small>
+            </article>
+            <article class="forecast-stat">
+              <span>Recorded so far</span>
+              <strong id="forecast-actual">—</strong>
+              <small id="forecast-days-caption">Actual spending this month</small>
+            </article>
+            <article class="forecast-stat forecast-savings">
+              <span>Potential savings</span>
+              <strong id="forecast-savings">—</strong>
+              <small id="forecast-savings-caption">Budget headroom after projected spending</small>
+            </article>
+          </div>
+          <p class="forecast-method" id="forecast-method"></p>
+          <div class="forecast-content">
+            <section class="forecast-card" aria-labelledby="forecast-categories-title">
+              <div class="forecast-card-heading">
+                <div>
+                  <h3 id="forecast-categories-title">Expected category expenditure</h3>
+                  <p>Projected spending through the end of this month.</p>
+                </div>
+              </div>
+              <div class="forecast-category-list" id="forecast-category-list"></div>
+              <p class="forecast-empty" id="forecast-empty" hidden>Add expenses to build a forecast from your spending history.</p>
+            </section>
+            <aside class="forecast-note">
+              <strong>How to read this estimate</strong>
+              <p id="forecast-note">Actual spending so far is combined with an estimated daily rate for the remaining days.</p>
+              <p id="forecast-budget-note">Potential savings are estimated only when monthly category budgets are set; this is budget headroom, not income-based savings.</p>
+              <a href="/budgets">Manage monthly budgets <span aria-hidden="true">→</span></a>
+            </aside>
+          </div>
+        </section>
+
+        <section class="panel financial-assistant-panel" id="financial-assistant" aria-labelledby="assistant-title">
+          <div class="panel-heading assistant-heading">
+            <div>
+              <p class="eyebrow">PRIVATE, DATA-DRIVEN HELP</p>
+              <h2 id="assistant-title">AI Financial Assistance</h2>
+              <p class="assistant-intro">Ask about your spending and get practical ways to review it.</p>
+            </div>
+            <span class="assistant-badge"><span aria-hidden="true">✦</span> Local assistant</span>
+          </div>
+          <p class="assistant-privacy">Your question is analyzed by the local SpendWise server. Expense details are not sent to an external AI service or saved as chat history.</p>
+          <div class="assistant-prompts" aria-label="Suggested questions">
+            <button type="button" class="assistant-prompt" data-assistant-question="Where did most of my money go this month?">Where did most of my money go this month?</button>
+            <button type="button" class="assistant-prompt" data-assistant-question="How much did I spend on food last week?">How much did I spend on food last week?</button>
+            <button type="button" class="assistant-prompt" data-assistant-question="How can I reduce my expenses?">How can I reduce my expenses?</button>
+          </div>
+          <div class="assistant-conversation" id="assistant-conversation" role="log" aria-live="polite" aria-relevant="additions">
+            <article class="assistant-turn assistant-reply">
+              <p>Ask one of the suggested questions or type your own. I can summarize this month's largest spending category, calculate a category total for last week, and suggest areas to review.</p>
+            </article>
+          </div>
+          <form class="assistant-form" id="assistant-form">
+            <label class="sr-only" for="assistant-question">Ask about your spending</label>
+            <input id="assistant-question" name="question" type="text" maxlength="300" placeholder="Ask a question about your spending…" autocomplete="off" required>
+            <button class="primary-button" id="assistant-submit" type="submit">Ask <span aria-hidden="true">→</span></button>
+          </form>
+          <p class="assistant-period-note">“Last week” means the previous Monday–Sunday calendar week. Suggestions are general spending ideas, not financial advice.</p>
+          <p class="assistant-status" id="assistant-status" role="status" aria-live="polite"></p>
         </section>
 
         <section class="panel expense-calendar-panel" id="expense-calendar" aria-labelledby="expense-calendar-title">
@@ -333,6 +413,13 @@
                 <input id="month-filter" type="month" aria-label="Filter by month">
               </label>
               <button class="text-button" id="clear-filters" type="button">Clear</button>
+            </div>
+            <div class="ledger-scroll-controls">
+              <p class="ledger-scroll-hint">Use the arrows or scroll sideways to view all columns.</p>
+              <div class="ledger-scroll-buttons">
+                <button class="ledger-scroll-button" id="ledger-scroll-left" type="button" aria-label="Scroll ledger left">←</button>
+                <button class="ledger-scroll-button" id="ledger-scroll-right" type="button" aria-label="Scroll ledger right">→</button>
+              </div>
             </div>
             <div class="table-wrap">
               <table>

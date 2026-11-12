@@ -56,6 +56,7 @@ function createSpendingComparison(expenses, month) {
       date: expense.date,
       amountCents,
       medianCents,
+      sampleSize: categoryExpenses.length,
       multiple: Math.round((amountCents / medianCents) * 10) / 10,
     }];
   }).sort((first, second) => second.amountCents - first.amountCents);

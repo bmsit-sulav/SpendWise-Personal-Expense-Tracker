@@ -14,6 +14,8 @@ const {
 const { createExchangeRateService } = require("./exchange-rates");
 const { createSpendingComparison } = require("./spending-comparison");
 const { createExpenseCalendar } = require("./expense-calendar");
+const { createExpenseForecast } = require("./expense-forecast");
+const { answerFinancialQuestion } = require("./financial-assistant");
 
 const ROOT = path.resolve(__dirname, "..");
 const DEFAULT_PUBLIC_DIR = path.join(ROOT, "public");
@@ -124,6 +126,32 @@ function createApp(options = {}) {
         sendJson(response, 200, createExpenseCalendar(await store.list(), month));
         return;
       }
+      if (request.method === "GET" && pathname === "/api/expense-forecast") {
+        const now = options.now ? options.now() : new Date();
+        const month = localDateValue(now).slice(0, 7);
+        const [expenses, budgets] = await Promise.all([
+          store.list(),
+          budgetStore.list(month),
+        ]);
+        sendJson(response, 200, createExpenseForecast(expenses, budgets, now));
+        return;
+      }
+      if (request.method === "POST" && pathname === "/api/financial-assistant") {
+        const body = await readJson(request);
+        if (typeof body?.question !== "string" || !body.question.trim()) {
+          const error = new Error("Enter a question for the financial assistant.");
+          error.statusCode = 400;
+          throw error;
+        }
+        if (body.question.length > 300) {
+          const error = new Error("Questions must be 300 characters or fewer.");
+          error.statusCode = 400;
+          throw error;
+        }
+        const now = options.now ? options.now() : new Date();
+        sendJson(response, 200, answerFinancialQuestion(body.question, await store.list(), now));
+        return;
+      }
       if (pathname === "/api/budgets" && request.method === "GET") {
         const month = validateBudgetMonth(url.searchParams.get("month"));
         sendJson(response, 200, await budgetStore.list(month));
@@ -193,7 +221,7 @@ function createApp(options = {}) {
       }
       if (
         request.method === "GET" &&
-        ["/comparison", "/budgets", "/savings-goals", "/calendar"].includes(pathname)
+        ["/comparison", "/budgets", "/savings-goals", "/calendar", "/forecasting", "/assistant"].includes(pathname)
       ) {
         await serveStatic(request, response, publicDir, "/");
         return;

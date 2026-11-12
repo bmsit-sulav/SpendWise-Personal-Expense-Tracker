@@ -30,9 +30,12 @@ SpendWise is a local-first expense tracker for recording everyday purchases, rev
 ### Insights and budgets
 
 - Compare the current month with the previous month, including category-level changes and percentages.
-- Flag unusually large expenses when an amount is at least twice the category median, provided there are at least three expenses in the comparison period.
+- Show in-app alerts when total or category spending increases month over month.
+- Flag unusually large expenses when an amount is at least twice the category median, provided there are at least three expenses in the comparison period; show the transaction, median, sample size, and reason.
 - Set category budgets by month, track utilization, and see alerts at 75%, 90%, and 100%.
 - See the remaining monthly balance across all category budgets.
+- Forecast expected month-end and category spending using recent monthly history; compare the forecast with budgets to estimate remaining budget headroom.
+- Ask the local financial assistant about the highest-spending category this month, a category's spending last week, and practical areas to review for possible reductions.
 - View a monthly calendar with daily totals and high-spending days; identify possible weekly or monthly recurring expenses from transaction history.
 
 ### Savings and currency
@@ -40,7 +43,7 @@ SpendWise is a local-first expense tracker for recording everyday purchases, rev
 - Create savings goals with a target and deadline, update the saved amount, and track progress and the monthly saving pace.
 - Use INR, USD, EUR, GBP, or NPR for display and expense entry. Values are stored in INR.
 - Keep expenses, budgets, savings goals, and cached exchange rates in local files.
-- Open the overview, spending comparison, budgets, savings goals, and expense calendar as separate pages.
+- Open the overview, spending comparison, expense forecasting, financial assistant, budgets, savings goals, and expense calendar as separate pages.
 
 ## Requirements
 
@@ -87,7 +90,7 @@ To run without Flask, start the Node.js server and open [http://127.0.0.1:3000](
 npm start
 ```
 
-Feature pages are available at `/comparison`, `/budgets`, `/savings-goals`, and `/calendar` in either serving mode. The overview remains at `/`.
+Feature pages are available at `/comparison`, `/forecasting`, `/assistant`, `/budgets`, `/savings-goals`, and `/calendar` in either serving mode. The overview remains at `/`.
 
 To use a different port:
 
@@ -144,6 +147,8 @@ All endpoints are served from the same origin as the browser UI.
 | --- | --- | --- |
 | `GET` | `/api/expenses` | List expenses; amounts are returned in INR |
 | `GET` | `/api/spending-comparison?month=YYYY-MM` | Compare a month with the previous month |
+| `GET` | `/api/expense-forecast` | Estimate current month-end and category spending from recent history and monthly budgets |
+| `POST` | `/api/financial-assistant` | Answer a supported spending question from the local expense ledger |
 | `GET` | `/api/expense-calendar?month=YYYY-MM` | Get daily totals, high-spending days, and recurring patterns |
 | `POST` | `/api/expenses` | Create an expense |
 | `PUT` | `/api/expenses/:id` | Update an expense |
@@ -161,7 +166,11 @@ Budget amounts must be positive and have no more than two decimal places. A budg
 
 The monthly remaining balance is the sum of category budgets minus **all** recorded expenses for that month. It can be negative when spending exceeds the combined limits. Each category's progress and threshold alerts use only expenses matching that category in the selected month. A category shows a warning at 75% utilization, a higher warning at 90%, and a critical alert at or above 100%.
 
-The spending comparison uses the current calendar month and the preceding calendar month. Category and total percentage changes use the previous month's spending as the baseline; when the previous amount is zero, the UI labels the current spending as new instead of showing an undefined percentage. An expense is highlighted as unusual when the category has at least three expenses across the two months and the individual amount is at least twice that category's median expense. This is a simple spending signal, not a financial or fraud assessment.
+The spending comparison uses the current calendar month and the preceding calendar month. Category and total percentage changes use the previous month's spending as the baseline; when the previous amount is zero, the UI labels the current spending as new instead of showing an undefined percentage. In-app alerts report positive month-over-month changes in total and category spending; every increase is surfaced, with no minimum threshold. An expense is highlighted as unusual when its category has at least three transactions across the two months and the individual amount is at least twice that category's median transaction. The alert explains the amount, median, and sample size. These alerts appear on the spending-comparison page; the app does not send push notifications. This is a simple spending signal, not a financial or fraud assessment.
+
+Expense forecasting adds actual spending so far this month to an estimate for the remaining days. The estimate uses the average daily total for up to the three preceding calendar months with recorded expenses; if no prior month has tracked expenses, it extends the current month's pace instead. Category projections use the same history, while categories without prior spending history include only their current-month actuals. Potential savings are shown only when the current month has budgets, and mean projected budget headroom—not savings calculated from income. With no usable expense history, the forecast and potential savings remain unavailable.
+
+The financial assistant is a local, rule-based feature rather than a connection to a hosted AI model. It answers the largest-category question using this month's expenses, treats “last week” as the previous Monday–Sunday calendar week, and suggests general ways to review this month's top spending categories. The question is processed by the Node.js server using the local ledger; it is not sent to an external AI service, and questions and answers are not written to the data files. Unsupported questions receive examples of the supported topics.
 
 Savings goals are tracked separately from expenses. Enter a goal name, target amount, deadline, and optional saved-to-date amount. Update the saved amount manually whenever you add to the goal; goals do not automatically link to expenses or budgets. Goal amounts are stored in INR and displayed in the selected currency. For an active goal, the app divides the remaining amount by the number of calendar months from the current month through the deadline month, including both months, and rounds up to the nearest paise. A completed goal needs no further monthly saving; an incomplete goal past its deadline is marked overdue.
 
@@ -214,6 +223,8 @@ server/
   store.js                JSON-backed expense operations
   budget-store.js         Monthly category budget persistence
   spending-comparison.js Month-over-month totals, category changes, and outlier detection
+  expense-forecast.js    Current-month total and category spending projections
+  financial-assistant.js Local question intent and spending summaries
   savings-goal-store.js   Savings goal persistence
   savings-goal-plan.js    Monthly savings plan calculations
   expense-calendar.js     Daily totals, high-spend flags, and recurring patterns

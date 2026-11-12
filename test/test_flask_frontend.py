@@ -33,7 +33,7 @@ class FlaskFrontendTests(unittest.TestCase):
         self.assertIn(b"SpendWise", page.data)
         self.assertIn(b"Savings goals", page.data)
 
-        for route in ["/comparison", "/budgets", "/savings-goals", "/calendar"]:
+        for route in ["/comparison", "/forecasting", "/assistant", "/budgets", "/savings-goals", "/calendar"]:
             feature_page = self.client.get(route)
             self.assertEqual(feature_page.status_code, 200)
             self.assertIn(b"page-route.js", feature_page.data)
@@ -41,6 +41,8 @@ class FlaskFrontendTests(unittest.TestCase):
         script = self.client.get("/app.js")
         self.assertEqual(script.status_code, 200)
         self.assertIn(b"/api/savings-goals", script.data)
+        self.assertIn(b"/api/expense-forecast", script.data)
+        self.assertIn(b"/api/financial-assistant", script.data)
         script.close()
 
     @patch("flask_frontend.urlopen")
