@@ -480,6 +480,23 @@ function renderExpenseCalendar() {
     button.addEventListener("click", () => {
       selectedCalendarDate = day.date;
       renderExpenseCalendar();
+      if (!window.matchMedia("(prefers-reduced-motion: reduce)").matches) {
+        document.querySelector(".calendar-day.selected").animate(
+          [
+            { transform: "scale(1)" },
+            { transform: "scale(1.045)" },
+            { transform: "scale(1)" },
+          ],
+          { duration: 250, easing: "cubic-bezier(0.2, 0.7, 0.2, 1)" },
+        );
+        document.querySelector(".calendar-day-card").animate(
+          [
+            { opacity: 0, transform: "translateY(8px) scale(0.985)" },
+            { opacity: 1, transform: "translateY(0) scale(1)" },
+          ],
+          { duration: 250, easing: "cubic-bezier(0.2, 0.7, 0.2, 1)" },
+        );
+      }
     });
     calendarGrid.append(button);
   }
